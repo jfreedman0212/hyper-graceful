@@ -19,13 +19,12 @@ async fn main() {
     let http = Http::new();
     let manager = ConnectionManager::default();
 
-    let svc =
-        service_fn(|_| async {
-            for _ in 0..10 {
-                tokio::time::sleep(Duration::from_secs(1)).await;
-            }
-            Ok::<_, Infallible>(Response::new(Body::from("Hello, World!")))
-        });
+    let svc = service_fn(|_| async {
+        for _ in 0..10 {
+            tokio::time::sleep(Duration::from_secs(1)).await;
+        }
+        Ok::<_, Infallible>(Response::new(Body::from("Hello, World!")))
+    });
 
     loop {
         tokio::select! {
@@ -44,7 +43,10 @@ async fn main() {
             }
         }
     }
-    println!("Gracefully shutting down {} connections", manager.graceful_shutdown());
+    println!(
+        "Gracefully shutting down {} connections",
+        manager.graceful_shutdown()
+    );
     // In a real application you should wrap this in a timeout
     manager.wait_for_connections().await;
 }
