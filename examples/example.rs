@@ -21,7 +21,7 @@ async fn main() {
     let manager = ConnectionManager::default();
 
     let svc = service_fn(|_| async {
-        let s = stream::iter((0..10).into_iter()).then(|i| async move {
+        let s = stream::iter(0..10).then(|i| async move {
             tokio::time::sleep(Duration::from_secs(1)).await;
             Ok::<_, Infallible>(format!("{}\n", 10 - i))
         });
