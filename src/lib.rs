@@ -1,4 +1,4 @@
 pub mod connection;
 mod manager;
 
-pub use manager::ConnectionManager;
+pub use manager::{ConnectionManager, GracefulShutdownResult};

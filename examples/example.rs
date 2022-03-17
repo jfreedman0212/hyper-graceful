@@ -43,10 +43,13 @@ async fn main() {
             }
         }
     }
+    let res = manager.graceful_shutdown(Duration::from_secs(5)).await;
     println!(
-        "Gracefully shutting down {} connections",
-        manager.graceful_shutdown()
+        "Gracefully shutdown {} connections",
+        res.gracefully_shutdown_connections()
     );
-    // In a real application you should wrap this in a timeout
-    manager.wait_for_connections().await;
+    println!(
+        "Forcefully shutdown {} connections",
+        res.forcefully_shutdown_connections()
+    );
 }

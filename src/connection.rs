@@ -2,6 +2,7 @@ use pin_project_lite::pin_project;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use thiserror::Error;
 use tokio::sync::{broadcast, mpsc};
 
 pin_project! {
@@ -9,8 +10,10 @@ pin_project! {
         #[pin]
         inner: T,
         #[pin]
-        receiver: broadcast::Receiver<()>,
+        graceful_receiver: broadcast::Receiver<()>,
         on_shutdown: Option<F>,
+        #[pin]
+        cancel_receiver: broadcast::Receiver<()>,
         data: mpsc::Sender<()>,
     }
 }
@@ -22,31 +25,40 @@ where
 {
     pub(crate) fn new(
         future: T,
-        receiver: broadcast::Receiver<()>,
+        graceful_receiver: broadcast::Receiver<()>,
         on_shutdown: F,
+        cancel_receiver: broadcast::Receiver<()>,
         data: mpsc::Sender<()>,
     ) -> Self {
         Self {
             inner: future,
-            receiver,
+            graceful_receiver,
             on_shutdown: Some(on_shutdown),
+            cancel_receiver,
             data,
         }
     }
 }
+
+#[derive(Debug, Clone, Error)]
+#[error("Connection was forcefully closed")]
+pub struct ForcefullyClosed;
 
 impl<T, F, O> Future for GracefulConnection<T, F>
 where
     T: Future<Output = O>,
     F: FnOnce(Pin<&mut T>),
 {
-    type Output = O;
+    type Output = Result<O, ForcefullyClosed>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut this = self.project();
-        if this.on_shutdown.is_some() && this.receiver.try_recv().is_ok() {
+        if this.on_shutdown.is_some() && this.graceful_receiver.try_recv().is_ok() {
             (this.on_shutdown.take().unwrap())(this.inner.as_mut());
         }
-        this.inner.poll(cx)
+        if this.cancel_receiver.try_recv().is_ok() {
+            return Poll::Ready(Err(ForcefullyClosed));
+        }
+        this.inner.poll(cx).map(|r| Ok(r))
     }
 }
