@@ -3,7 +3,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::time::Duration;
 use tokio::sync::{broadcast, mpsc};
-use tokio::time::Instant;
+use tokio::time::{Instant, Timeout};
 
 /// Based on the [Tokio Shutdown Guide](https://tokio.rs/tokio/topics/shutdown)
 /// This uses a broadcast channel to send a signal that the connections should begin shutting down
@@ -27,12 +27,6 @@ impl Default for ConnectionManager {
             tracker_rx,
         }
     }
-}
-
-#[derive(Debug, Clone)]
-pub struct GracefulShutdownResult {
-    graceful: usize,
-    forced: usize,
 }
 
 impl ConnectionManager {
@@ -60,53 +54,44 @@ impl ConnectionManager {
         )
     }
 
-    /// Waits for the remaining connections to finish
-    /// If the timeout is exceeded then they are forcefully cancelled
-    pub async fn graceful_shutdown(mut self, timeout: Duration) -> GracefulShutdownResult {
+    async fn graceful_shutdown_impl<X: MakeTimeout>(mut self, x: X) -> (usize, usize) {
         let graceful = self.graceful_broadcast_tx.send(()).unwrap_or(0);
         drop(self.tracker_tx);
-        if tokio::time::timeout(timeout, self.tracker_rx.recv())
-            .await
-            .is_ok()
-        {
-            return GracefulShutdownResult {
-                graceful,
-                forced: 0,
-            };
-        };
-        let forced = self.cancel_broadcast_tx.send(()).unwrap_or(0);
-        self.tracker_rx.recv().await;
-        GracefulShutdownResult { graceful, forced }
-    }
-
-    /// Waits for the remaining connections to finish
-    /// If the timeout is exceeded then they are forcefully cancelled
-    pub async fn graceful_shutdown_by(mut self, timeout: Instant) -> GracefulShutdownResult {
-        let graceful = self.graceful_broadcast_tx.send(()).unwrap_or(0);
-        drop(self.tracker_tx);
-        if tokio::time::timeout_at(timeout, self.tracker_rx.recv())
-            .await
-            .is_ok()
-        {
-            return GracefulShutdownResult {
-                graceful,
-                forced: 0,
-            };
+        if x.make_timeout(self.tracker_rx.recv()).await.is_ok() {
+            return (graceful, 0);
         }
         let forced = self.cancel_broadcast_tx.send(()).unwrap_or(0);
         self.tracker_rx.recv().await;
-        GracefulShutdownResult { graceful, forced }
+        (graceful - forced, forced)
+    }
+
+    /// Waits for the remaining connections to finish
+    /// If the timeout is exceeded then they are forcefully closed
+    /// Returns count of gracefully and forcibly closed connections
+    pub async fn graceful_shutdown(self, timeout: Duration) -> (usize, usize) {
+        self.graceful_shutdown_impl(timeout).await
+    }
+
+    /// Waits for the remaining connections to finish
+    /// If the timeout is exceeded then they are forcefully closed
+    /// Returns count of gracefully and forcibly closed connections
+    pub async fn graceful_shutdown_by(self, instant: Instant) -> (usize, usize) {
+        self.graceful_shutdown_impl(instant).await
     }
 }
 
-impl GracefulShutdownResult {
-    /// Number of connections which completed
-    pub fn gracefully_shutdown_connections(&self) -> usize {
-        self.graceful
-    }
+trait MakeTimeout {
+    fn make_timeout<O: Future>(self, future: O) -> Timeout<O>;
+}
 
-    /// Number of connections which were cancelled
-    pub fn forcefully_shutdown_connections(&self) -> usize {
-        self.forced
+impl MakeTimeout for Duration {
+    fn make_timeout<O: Future>(self, future: O) -> Timeout<O> {
+        tokio::time::timeout(self, future)
+    }
+}
+
+impl MakeTimeout for Instant {
+    fn make_timeout<O: Future>(self, future: O) -> Timeout<O> {
+        tokio::time::timeout_at(self, future)
     }
 }

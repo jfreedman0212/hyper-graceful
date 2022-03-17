@@ -43,13 +43,7 @@ async fn main() {
             }
         }
     }
-    let res = manager.graceful_shutdown(Duration::from_secs(5)).await;
-    println!(
-        "Gracefully shutdown {} connections",
-        res.gracefully_shutdown_connections()
-    );
-    println!(
-        "Forcefully shutdown {} connections",
-        res.forcefully_shutdown_connections()
-    );
+    let (graceful, forced) = manager.graceful_shutdown(Duration::from_secs(5)).await;
+    println!("Gracefully shutdown {} connections", graceful);
+    println!("Forcefully shutdown {} connections", forced);
 }
