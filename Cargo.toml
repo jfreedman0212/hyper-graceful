@@ -12,7 +12,7 @@ thiserror = "1.0"
 tokio = { version = "1", features = ["sync", "time"] }
 
 [dev-dependencies]
-hyper = { version = "0.14.1", features = ["http1", "server", "tcp"] }
+hyper = { version = "0.14.1", features = ["http1", "server", "tcp", "stream"] }
 tokio = { version = "1", features = ["rt", "macros", "net", "signal"] }
 
 

@@ -1,3 +1,4 @@
+use futures::stream::{self, StreamExt};
 use hyper::server::conn::Http;
 use hyper::service::service_fn;
 use hyper::{Body, Response};
@@ -20,10 +21,11 @@ async fn main() {
     let manager = ConnectionManager::default();
 
     let svc = service_fn(|_| async {
-        for _ in 0..10 {
+        let s = stream::iter((0..10).into_iter()).then(|i| async move {
             tokio::time::sleep(Duration::from_secs(1)).await;
-        }
-        Ok::<_, Infallible>(Response::new(Body::from("Hello, World!")))
+            Ok::<_, Infallible>(format!("{}\n", 10 - i))
+        });
+        Ok::<_, Infallible>(Response::new(Body::wrap_stream(s)))
     });
 
     loop {
