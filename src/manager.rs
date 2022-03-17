@@ -54,8 +54,15 @@ impl ConnectionManager {
         )
     }
 
+    /// Signals all connections to begin a graceful shutdown
+    /// Does not wait for it to complete
+    /// Returns number of connections that were signalled
+    pub fn graceful_shutdown_connections(&self) -> usize {
+        self.graceful_broadcast_tx.send(()).unwrap_or(0)
+    }
+
     async fn graceful_shutdown_impl<X: MakeTimeout>(mut self, x: X) -> (usize, usize) {
-        let graceful = self.graceful_broadcast_tx.send(()).unwrap_or(0);
+        let graceful = self.graceful_shutdown_connections();
         drop(self.tracker_tx);
         if x.make_timeout(self.tracker_rx.recv()).await.is_ok() {
             return (graceful, 0);
