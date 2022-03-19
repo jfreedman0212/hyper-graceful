@@ -9,7 +9,7 @@ pin_project! {
     pub struct GracefulConnection<T, F> {
         #[pin]
         inner: T,
-        graceful_receiver: Option<broadcast::Receiver<()>>,
+        graceful_receiver: broadcast::Receiver<()>,
         on_shutdown: Option<F>,
         cancel_receiver: broadcast::Receiver<()>,
         data: mpsc::Sender<()>,
@@ -30,7 +30,7 @@ where
     ) -> Self {
         Self {
             inner: future,
-            graceful_receiver: Some(graceful_receiver),
+            graceful_receiver,
             on_shutdown: Some(on_shutdown),
             cancel_receiver,
             data,
@@ -51,14 +51,7 @@ where
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut this = self.project();
-        if this
-            .graceful_receiver
-            .as_mut()
-            .map(|r| r.try_recv().is_ok())
-            .unwrap_or(false)
-        {
-            // We drop the receiver so that the connection cannot be signalled twice
-            this.graceful_receiver.take();
+        if this.graceful_receiver.try_recv().is_ok() && this.on_shutdown.is_some() {
             (this.on_shutdown.take().unwrap())(this.inner.as_mut());
         }
         if this.cancel_receiver.try_recv().is_ok() {
