@@ -39,15 +39,15 @@ where
 }
 
 #[derive(Debug, Clone, Error)]
-#[error("Connection was forcefully closed")]
-pub struct ForcefullyClosed;
+#[error("Connection was forcibly closed")]
+pub struct ForciblyClosed;
 
 impl<T, F, O> Future for GracefulConnection<T, F>
 where
     T: Future<Output = O>,
     F: FnOnce(Pin<&mut T>),
 {
-    type Output = Result<O, ForcefullyClosed>;
+    type Output = Result<O, ForciblyClosed>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut this = self.project();
@@ -55,7 +55,7 @@ where
             (this.on_shutdown.take().unwrap())(this.inner.as_mut());
         }
         if this.cancel_receiver.try_recv().is_ok() {
-            return Poll::Ready(Err(ForcefullyClosed));
+            return Poll::Ready(Err(ForciblyClosed));
         }
         this.inner.poll(cx).map(|r| Ok(r))
     }

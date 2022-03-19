@@ -73,14 +73,14 @@ impl ConnectionManager {
     }
 
     /// Waits for the remaining connections to finish
-    /// If the timeout is exceeded then they are forcefully closed
+    /// If the timeout is exceeded then they are forcibly closed
     /// Returns count of gracefully and forcibly closed connections
     pub async fn graceful_shutdown(self, timeout: Duration) -> (usize, usize) {
         self.graceful_shutdown_impl(timeout).await
     }
 
     /// Waits for the remaining connections to finish
-    /// If the timeout is exceeded then they are forcefully closed
+    /// If the timeout is exceeded then they are forcibly closed
     /// Returns count of gracefully and forcibly closed connections
     pub async fn graceful_shutdown_by(self, instant: Instant) -> (usize, usize) {
         self.graceful_shutdown_impl(instant).await
