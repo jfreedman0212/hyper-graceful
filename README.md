@@ -8,4 +8,7 @@ A Graceful Shutdown tool for use with
 
 [See the example](./examples/example.rs)
 
-See also: https://github.com/hyperium/hyper/issues/2321
+See: 
+
+- https://github.com/hyperium/hyper/issues/2321
+- https://github.com/hyperium/hyper/issues/2777
